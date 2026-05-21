@@ -11,8 +11,8 @@ const N      = 12
 
 const t_hop  = 1.0
 const V      = 1.0
-const tp_hop = 0.32
-const Vp     = 0.32
+const tp_hop = 0.0
+const Vp     = 0.0
 const μ      = 0.0
 const α      = 0.0
 
