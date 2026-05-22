@@ -11,8 +11,8 @@
 
 using LinearAlgebra, Printf
 
-const L      = 18
-const N      = 12
+const L      = 17
+const N      = 6
 const t_hop  = 1.0
 const V      = 1.0
 const tp_hop = 0.0
@@ -153,8 +153,11 @@ end
 # ── main ─────────────────────────────────────────────────────────────────────
 
 # Center bond (0-indexed): sites L÷2-1 and L÷2  →  sites L÷2 and L÷2+1 (1-indexed display)
-j1 = L ÷ 2 - 1
-j2 = L ÷ 2
+# j1 = L ÷ 2 - 1
+# j2 = L ÷ 2
+
+j1 = 1
+j2 = 2
 
 @printf "L=%d  N=%d  t=%.2f  V=%.2f  tp=%.2f  Vp=%.2f\n" L N t_hop V tp_hop Vp
 @printf "Building state_info for %d states...\n" binomial(L, N); flush(stdout)
