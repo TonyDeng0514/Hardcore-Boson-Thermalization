@@ -2,7 +2,9 @@
   "permissions": {
     "allow": [
       "Bash(ls \"/Users/yongtaodeng/Academic/Rice/Research/PrepareParaparticleOnQC/Hardcore Boson/ED\")",
-      "Read(//Users/yongtaodeng/Academic/Rice/Research/PrepareParaparticleOnQC/Hardcore Boson/ED/**)"
+      "Read(//Users/yongtaodeng/Academic/Rice/Research/PrepareParaparticleOnQC/Hardcore Boson/ED/**)",
+      "Bash(julia --version)",
+      "Bash(python3 *)"
     ]
   }
 }
