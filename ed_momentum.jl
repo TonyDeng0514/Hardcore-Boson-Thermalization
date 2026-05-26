@@ -11,13 +11,6 @@
 
 using LinearAlgebra, Printf
 
-const L      = 17
-const N      = 6
-const t_hop  = 1.0
-const V      = 1.0
-const tp_hop = 0.0
-const Vp     = 0.0
-
 # ── bitstring utilities (0-indexed sites; bit j = site j) ────────────────────
 
 translate(s::Int, L::Int) = ((s << 1) | (s >> (L - 1))) & ((1 << L) - 1)
@@ -152,39 +145,34 @@ end
 
 # ── main ─────────────────────────────────────────────────────────────────────
 
-# Center bond (0-indexed): sites L÷2-1 and L÷2  →  sites L÷2 and L÷2+1 (1-indexed display)
-# j1 = L ÷ 2 - 1
-# j2 = L ÷ 2
+function run_ed_momentum(L, N, t_hop=1.0, V=1.0, tp_hop=0.0, Vp=0.0; j1=1,j2=2, outdir="results/")
+    @printf "L=%d  N=%d  t=%.2f  V=%.2f  tp=%.2f  Vp=%.2f\n" L N t_hop V tp_hop Vp
+    @printf "Building state_info for %d states...\n" binomial(L, N); flush(stdout)
+    state_info = build_state_info(L, N)
 
-j1 = 1
-j2 = 2
+    mkpath(outdir)
+    outfile = joinpath(outdir, "ed_ksectors_L$(L)_N$(N)_tp$(tp_hop)_Vp$(Vp).csv")
 
-@printf "L=%d  N=%d  t=%.2f  V=%.2f  tp=%.2f  Vp=%.2f\n" L N t_hop V tp_hop Vp
-@printf "Building state_info for %d states...\n" binomial(L, N); flush(stdout)
-state_info = build_state_info(L, N)
+    open(outfile, "w") do f
+        println(f, "# PBC momentum-sector ED  L=$(L) N=$(N) t=$(t_hop) V=$(V) tp=$(tp_hop) Vp=$(Vp)  O=n_$(j1+1)*n_$(j2+1) (1-indexed)")
+        println(f, "sector,energy,O_expval")
 
-mkpath("results")
-outfile = "results/ed_ksectors_L$(L)_N$(N)_tp$(tp_hop)_Vp$(Vp).csv"
-
-open(outfile, "w") do f
-    println(f, "# PBC momentum-sector ED  L=$(L) N=$(N) t=$(t_hop) V=$(V) tp=$(tp_hop) Vp=$(Vp)  O=n_$(j1+1)*n_$(j2+1) (1-indexed)")
-    println(f, "sector,energy,O_expval")
-
-    dim_total = 0
-    for m in 0:L-1
-        basis = build_k_basis(L, N, m, state_info)
-        isempty(basis) && continue
-        Hk         = build_Hk(L, m, t_hop, V, tp_hop, Vp, state_info, basis)
-        vals, vecs = eigen(Hk)
-        obs        = obs_expvals(vecs, basis, j1, j2, L)
-        for n in eachindex(vals)
-            @printf f "%d,%.10f,%.10f\n" m vals[n] obs[n]
+        dim_total = 0
+        for m in 0:L-1
+            basis = build_k_basis(L, N, m, state_info)
+            isempty(basis) && continue
+            Hk         = build_Hk(L, m, t_hop, V, tp_hop, Vp, state_info, basis)
+            vals, vecs = eigen(Hk)
+            obs        = obs_expvals(vecs, basis, j1, j2, L)
+            for n in eachindex(vals)
+                @printf f "%d,%.10f,%.10f\n" m vals[n] obs[n]
+            end
+            dim_total += length(basis)
+            @printf "sector m=%2d  dim=%4d\n" m length(basis); flush(stdout)
         end
-        dim_total += length(basis)
-        @printf "sector m=%2d  dim=%4d\n" m length(basis); flush(stdout)
+
+        @printf "Total dim = %d  (expected binomial(%d,%d) = %d)\n" dim_total L N binomial(L, N)
     end
 
-    @printf "Total dim = %d  (expected binomial(%d,%d) = %d)\n" dim_total L N binomial(L, N)
+    @printf "Saved → %s\n" outfile
 end
-
-@printf "Saved → %s\n" outfile

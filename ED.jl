@@ -6,16 +6,6 @@
 
 using LinearAlgebra, SparseArrays, Printf
 
-const L      = 18
-const N      = 12
-
-const t_hop  = 1.0
-const V      = 1.0
-const tp_hop = 0.0
-const Vp     = 0.0
-const μ      = 0.0
-const α      = 0.0
-
 # local 2×2 operators  (basis: |0⟩=empty, |1⟩=occupied)
 const _bdag = sparse([2], [1], [1.0], 2, 2)   # b†
 const _b    = sparse([1], [2], [1.0], 2, 2)   # b
@@ -77,40 +67,41 @@ function site_occupation(global_indices, j, L)
         Float64(div(k, 2^(L-j)) % 2)
     end
 end
+function run_ed(L, N, t_hop=1.0, V=1.0, tp_hop=0.0, Vp=0.0, μ=0.0, α=0.0; outdir="results/")
+    # ─── sector ──────────────────────────────────────────────────────────────────
+    idx   = n_sector_indices(L, N)
+    dim_N = length(idx)
+    @printf "L=%d  N=%d  t=%.2f  V=%.2f  tp=%.2f  Vp=%.2f  μ=%.2f  α=%.2f\n" L N t_hop V tp_hop Vp μ α
+    @printf "N-sector dimension: %d\n" dim_N
+    @printf "Estimated memory (H + eigenvecs): ~%.1f MB\n\n" (2 * dim_N^2 * 8 / 1e6)
 
-# ─── sector ──────────────────────────────────────────────────────────────────
-idx   = n_sector_indices(L, N)
-dim_N = length(idx)
-@printf "L=%d  N=%d  t=%.2f  V=%.2f  tp=%.2f  Vp=%.2f  μ=%.2f  α=%.2f\n" L N t_hop V tp_hop Vp μ α
-@printf "N-sector dimension: %d\n" dim_N
-@printf "Estimated memory (H + eigenvecs): ~%.1f MB\n\n" (2 * dim_N^2 * 8 / 1e6)
+    @printf "Building sparse Hamiltonian...\n"; flush(stdout)
+    H_sp = build_hamiltonian_ed(L, t_hop, V, tp_hop, Vp, μ, α)
 
-@printf "Building sparse Hamiltonian...\n"; flush(stdout)
-H_sp = build_hamiltonian_ed(L, t_hop, V, tp_hop, Vp, μ, α)
+    @printf "Extracting N-sector and converting to dense...\n"; flush(stdout)
+    H_N = Symmetric(Matrix(H_sp[idx, idx]))
 
-@printf "Extracting N-sector and converting to dense...\n"; flush(stdout)
-H_N = Symmetric(Matrix(H_sp[idx, idx]))
+    @printf "Diagonalizing (dim=%d)...\n" dim_N; flush(stdout)
+    vals, vecs = eigen(H_N)
 
-@printf "Diagonalizing (dim=%d)...\n" dim_N; flush(stdout)
-vals, vecs = eigen(H_N)
+    # ─── observable: O = n_{j1} * n_{j2}, center bond ────────────────────────────
+    # O is diagonal in the occupation basis, so no matrix needed.
+    # ⟨E_n|O|E_n⟩ = vecs[:,n].² ⋅ diag_O
+    j1, j2 = L ÷ 2, L ÷ 2 + 1
+    diag_O = site_occupation(idx, j1, L) .* site_occupation(idx, j2, L)
 
-# ─── observable: O = n_{j1} * n_{j2}, center bond ────────────────────────────
-# O is diagonal in the occupation basis, so no matrix needed.
-# ⟨E_n|O|E_n⟩ = vecs[:,n].² ⋅ diag_O
-j1, j2 = L ÷ 2, L ÷ 2 + 1
-diag_O = site_occupation(idx, j1, L) .* site_occupation(idx, j2, L)
+    @printf "Computing expectation values...\n"; flush(stdout)
+    obs_vals = [dot(vecs[:, n].^2, diag_O) for n in 1:dim_N]
 
-@printf "Computing expectation values...\n"; flush(stdout)
-obs_vals = [dot(vecs[:, n].^2, diag_O) for n in 1:dim_N]
-
-# ─── save ─────────────────────────────────────────────────────────────────────
-mkpath("results")
-outfile = "results/ed_L$(L)_N$(N)_tp$(tp_hop)_Vp$(Vp).csv"
-open(outfile, "w") do f
-    println(f, "# ED: O = n_$(j1)*n_$(j2),  L=$(L)  N=$(N)  t=$(t_hop)  V=$(V)  tp=$(tp_hop)  Vp=$(Vp)  mu=$(μ)  alpha=$(α)")
-    println(f, "energy,O_expval")
-    for n in 1:dim_N
-        @printf f "%.10f,%.10f\n" vals[n] obs_vals[n]
+    # ─── save ─────────────────────────────────────────────────────────────────────
+    mkpath(outdir)
+    outfile = joinpath(outdir, "ed_L$(L)_N$(N)_tp$(tp_hop)_Vp$(Vp).csv")
+    open(outfile, "w") do f
+        println(f, "# ED: O = n_$(j1)*n_$(j2),  L=$(L)  N=$(N)  t=$(t_hop)  V=$(V)  tp=$(tp_hop)  Vp=$(Vp)  mu=$(μ)  alpha=$(α)")
+        println(f, "energy,O_expval")
+        for n in 1:dim_N
+            @printf f "%.10f,%.10f\n" vals[n] obs_vals[n]
+        end
     end
+    @printf "Saved %d rows → %s\n" dim_N outfile
 end
-@printf "Saved %d rows → %s\n" dim_N outfile
