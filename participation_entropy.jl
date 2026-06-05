@@ -102,6 +102,9 @@ function run_participation_entropy(L, t_hop=1.0, V=1.0, tp_hop=0.3, Vp=0.3;
     C_t = zeros(ComplexF64, D)   # pre-allocated work vectors to avoid per-step allocation
     ψ_t = zeros(ComplexF64, D)
 
+    mkpath(outdir)
+    outfile = joinpath(outdir, "participation_entropy_L$(L)_tp$(@sprintf("%.3f",tp_hop))_Vp$(@sprintf("%.3f",Vp)).csv")
+
     @printf "Sampling %d random Fock initial states (S_z=0)...\n" n_samples; flush(stdout)
     for sample in 1:n_samples
         s0_idx = rand(rng, 1:D)
@@ -129,24 +132,20 @@ function run_participation_entropy(L, t_hop=1.0, V=1.0, tp_hop=0.3, Vp=0.3;
         C2_avg .+= C_s .^ 2
         @printf "  sample %2d:  χ(t_max)=%.4f  C(t_max)=%.4f  plateau=-1/(L-1)=%.4f\n" sample χ_s[end] C_s[end] (-1.0/(L-1))
         flush(stdout)
-    end
 
-    χ_avg ./= n_samples
-    χ_std   = sqrt.(max.(χ2_avg ./ n_samples .- χ_avg .^ 2, 0.0))
-    C_avg  ./= n_samples
-    C_std    = sqrt.(max.(C2_avg ./ n_samples .- C_avg .^ 2, 0.0))
-
-    # ── save ─────────────────────────────────────────────────────────────────────
-    mkpath(outdir)
-    outfile = joinpath(outdir, "participation_entropy_L$(L)_tp$(@sprintf("%.3f",tp_hop))_Vp$(@sprintf("%.3f",Vp)).csv")
-    open(outfile, "w") do f
-        println(f, "# χ_ent(t) = -ln(Σ_s |⟨s|ψ(t)⟩|^4)  Fock-basis IPR averaged over $n_samples random Fock initial states")
-        println(f, "# C(t) = (4/L) Σ_k [⟨n_k n_{k+1}⟩ - ⟨n_k⟩⟨n_{k+1}⟩]  connected NN density correlator; T=∞ plateau = -1/(L-1) = $(-1.0/(L-1))")
-        println(f, "# L=$L  N=$N  t_hop=$t_hop  V=$V  tp=$tp_hop  Vp=$Vp  rng_seed=$rng_seed")
-        println(f, "# ln(D) = $ln_D  (ergodic ceiling: χ_ent → ln(D) - ln(2) ≈ $(ln_D - log(2.0)) for thermalizing system)")
-        println(f, "time,chi_ent_mean,chi_ent_std,C_mean,C_std")
-        for (ti, t) in enumerate(times)
-            @printf f "%.4f,%.8f,%.8f,%.8f,%.8f\n" t χ_avg[ti] χ_std[ti] C_avg[ti] C_std[ti]
+        cur_χ_avg = χ_avg ./ sample
+        cur_χ_std = sqrt.(max.(χ2_avg ./ sample .- cur_χ_avg .^ 2, 0.0))
+        cur_C_avg = C_avg ./ sample
+        cur_C_std = sqrt.(max.(C2_avg ./ sample .- cur_C_avg .^ 2, 0.0))
+        open(outfile, "w") do f
+            println(f, "# χ_ent(t) = -ln(Σ_s |⟨s|ψ(t)⟩|^4)  Fock-basis IPR averaged over $sample/$n_samples random Fock initial states")
+            println(f, "# C(t) = (4/L) Σ_k [⟨n_k n_{k+1}⟩ - ⟨n_k⟩⟨n_{k+1}⟩]  connected NN density correlator; T=∞ plateau = -1/(L-1) = $(-1.0/(L-1))")
+            println(f, "# L=$L  N=$N  t_hop=$t_hop  V=$V  tp=$tp_hop  Vp=$Vp  rng_seed=$rng_seed")
+            println(f, "# ln(D) = $ln_D  (ergodic ceiling: χ_ent → ln(D) - ln(2) ≈ $(ln_D - log(2.0)) for thermalizing system)")
+            println(f, "time,chi_ent_mean,chi_ent_std,C_mean,C_std")
+            for (ti, t) in enumerate(times)
+                @printf f "%.4f,%.8f,%.8f,%.8f,%.8f\n" t cur_χ_avg[ti] cur_χ_std[ti] cur_C_avg[ti] cur_C_std[ti]
+            end
         end
     end
     @printf "\nln(D) = %.4f\nSaved → %s\n" ln_D outfile

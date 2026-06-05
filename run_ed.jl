@@ -1,3 +1,10 @@
+# Usage: julia -t auto run_ed.jl
+# -t auto sets Julia threads to all available cores; BLAS threads are matched below.
+# Dense eigen on the N-sector matrix (dim ~ C(L,N)) is LAPACK/BLAS-heavy.
+
+using LinearAlgebra, Base.Threads
+BLAS.set_num_threads(Threads.nthreads())
+
 include("ED.jl")
 
 L=18
